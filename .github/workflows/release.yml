@@ -1,0 +1,97 @@
+name: Build and release VSIX
+
+on:
+  push:
+    tags:
+      - 'v*'
+  # A manual run builds a downloadable artifact without publishing a release.
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/release.yml'
+      - 'scripts/package-vsix.cjs'
+      - 'scripts/verify-vsix.cjs'
+      - '.vscodeignore'
+      - 'package.json'
+      - 'package-lock.json'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Test, package and verify (Windows x64)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          architecture: x64
+          package-manager-cache: false
+
+      - name: Check release tag matches package version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ($env:GITHUB_REF_NAME -cne "v$version") {
+            throw "Tag '$env:GITHUB_REF_NAME' must match package.json version 'v$version'."
+          }
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm test
+
+      # Existing packaging script also runs type checking, lint and production build.
+      - name: Build Windows x64 VSIX
+        run: npm run package:vsix
+
+      - name: Verify packaged files and native HID loading
+        run: npm run verify:vsix
+
+      - name: Save verified VSIX
+        uses: actions/upload-artifact@v7
+        with:
+          name: qmkommand-win32-x64
+          path: artifacts/*-win32-x64.vsix
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Publish GitHub release
+    needs: build
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified VSIX
+        uses: actions/download-artifact@v8
+        with:
+          name: qmkommand-win32-x64
+          path: artifacts
+
+      - name: Create release with VSIX attached
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" artifacts/*.vsix \
+            --verify-tag \
+            --title "QMKommand $RELEASE_TAG" \
+            --generate-notes
