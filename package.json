@@ -10,16 +10,170 @@
     "Other"
   ],
   "activationEvents": [
-    "*"
+    "onStartupFinished"
   ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "qmkommand.helloWorld",
-        "title": "Hello World"
+        "command": "qmkommand.openBindings",
+        "title": "Open Bindings",
+        "category": "QMKommand"
+      },
+      {
+        "command": "qmkommand.reconnect",
+        "title": "Reconnect Keyboard",
+        "category": "QMKommand"
+      },
+      {
+        "command": "qmkommand.showLogs",
+        "title": "Show Logs",
+        "category": "QMKommand"
+      },
+      {
+        "command": "qmkommand.testKey",
+        "title": "Test Key",
+        "category": "QMKommand"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "QMKommand",
+      "properties": {
+        "qmkommand.bindings": {
+          "type": "array",
+          "scope": "application",
+          "default": [],
+          "description": "Map VSC_1 through VSC_32 to VS Code commands. Duplicate keys use the last entry. Unsupported properties (including when) are rejected.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "key",
+              "command"
+            ],
+            "properties": {
+              "key": {
+                "type": "string",
+                "enum": [
+                  "VSC_1",
+                  "VSC_2",
+                  "VSC_3",
+                  "VSC_4",
+                  "VSC_5",
+                  "VSC_6",
+                  "VSC_7",
+                  "VSC_8",
+                  "VSC_9",
+                  "VSC_10",
+                  "VSC_11",
+                  "VSC_12",
+                  "VSC_13",
+                  "VSC_14",
+                  "VSC_15",
+                  "VSC_16",
+                  "VSC_17",
+                  "VSC_18",
+                  "VSC_19",
+                  "VSC_20",
+                  "VSC_21",
+                  "VSC_22",
+                  "VSC_23",
+                  "VSC_24",
+                  "VSC_25",
+                  "VSC_26",
+                  "VSC_27",
+                  "VSC_28",
+                  "VSC_29",
+                  "VSC_30",
+                  "VSC_31",
+                  "VSC_32"
+                ],
+                "description": "VIA label: firmware action ID + 1."
+              },
+              "command": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S",
+                "description": "Existing VS Code command ID to execute while this window is focused."
+              },
+              "args": {
+                "type": [
+                  "null",
+                  "boolean",
+                  "number",
+                  "string",
+                  "array",
+                  "object"
+                ],
+                "description": "Optional JSON value passed as exactly one argument, including arrays and null."
+              }
+            }
+          }
+        },
+        "qmkommand.device": {
+          "type": "object",
+          "scope": "application",
+          "additionalProperties": false,
+          "required": [
+            "vendorId",
+            "productId",
+            "productName",
+            "usagePage",
+            "usage",
+            "path"
+          ],
+          "description": "Select the local Raw HID interface. All fields are required. IDs are decimal in JSON; null VID/PID or an empty productName disables connection. path optionally resolves ambiguity.",
+          "default": {
+            "vendorId": 17475,
+            "productId": 12337,
+            "productName": "thedanielceroefs",
+            "usagePage": 65376,
+            "usage": 97,
+            "path": ""
+          },
+          "properties": {
+            "vendorId": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 65535,
+              "description": "USB vendor ID. Repository default: 0x4443."
+            },
+            "productId": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 65535,
+              "description": "USB product ID. Repository default: 0x3031."
+            },
+            "productName": {
+              "type": "string",
+              "description": "Exact node-hid product string (case-sensitive). Empty disables connection."
+            },
+            "usagePage": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535,
+              "description": "Raw HID usage page. QMK default 0xFF60 (65376); override for your descriptor."
+            },
+            "usage": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535,
+              "description": "Raw HID usage. QMK default 0x61 (97); override for your descriptor."
+            },
+            "path": {
+              "type": "string",
+              "description": "Optional exact node-hid device path, in addition to all other filters. Empty matches any path; ambiguous matches are rejected."
+            }
+          }
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
@@ -30,10 +184,13 @@
     "package": "npm run check-types && npm run lint && node esbuild.js --production",
     "compile-tests": "tsc -p . --outDir out",
     "watch-tests": "tsc -p . -w --outDir out",
-    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "pretest": "npm run compile-tests",
     "check-types": "tsc --noEmit",
     "lint": "eslint src",
-    "test": "vscode-test"
+    "test": "mocha --ui tdd \"out/test/**/*.test.js\"",
+    "test:integration": "npm run compile-tests && npm run compile && vscode-test",
+    "package:vsix": "node --experimental-require-module scripts/package-vsix.cjs",
+    "verify:vsix": "node scripts/verify-vsix.cjs"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
@@ -41,11 +198,13 @@
     "@types/vscode": "^1.140.0",
     "@vscode/test-cli": "^0.0.15",
     "@vscode/test-electron": "^3.0.0",
+    "@vscode/vsce": "^4.0.0",
     "esbuild": "^0.28.1",
     "eslint": "^10.5.0",
     "npm-run-all": "^4.1.5",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.61.1"
+    "typescript-eslint": "^8.61.1",
+    "mocha": "^11.7.5"
   },
   "overrides": {
     "diff": "^8.0.4",
@@ -53,5 +212,9 @@
   },
   "dependencies": {
     "node-hid": "^3.4.0"
-  }
+  },
+  "publisher": "qmkommand-local",
+  "extensionKind": [
+    "ui"
+  ]
 }

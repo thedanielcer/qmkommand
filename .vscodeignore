@@ -1,7 +1,14 @@
 .vscode/**
 .vscode-test/**
 out/**
-node_modules/**
+node_modules/node-hid/hidapi/**
+node_modules/node-hid/src/**
+node_modules/node-hid/build/**
+node_modules/node-hid/prebuilds/**
+!node_modules/node-hid/prebuilds/HID-win32-x64/**
+node_modules/node-addon-api/**
+node_modules/pkg-prebuilds/bin/**
+node_modules/pkg-prebuilds/**/test/**
 src/**
 .gitignore
 .yarnrc
@@ -12,3 +19,7 @@ vsc-extension-quickstart.md
 **/*.map
 **/*.ts
 **/.vscode-test.*
+scripts/**
+artifacts/**
+*.vsix
+package-lock.json
